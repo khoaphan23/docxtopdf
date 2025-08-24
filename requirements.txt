@@ -1,0 +1,4 @@
+docx2pdf>=0.1.8
+pywin32>=305
+python-docx>=0.8.11
+Pillow>=10.0.0

@@ -1,0 +1,10 @@
+2025-08-24 00:26:52 - __main__ - INFO - WordToPDFApplication initialized successfully
+2025-08-24 00:26:53 - __main__ - INFO - Starting main application loop
+2025-08-24 00:26:57 - __main__ - INFO - File selected and validated: C:\Users\ADMIN\Downloads\muc8,9.docx
+2025-08-24 00:26:58 - __main__ - INFO - Converting: C:\Users\ADMIN\Downloads\muc8,9.docx -> D:\hoc\py\docxtopdf_thangvk\PDF_Output\muc8,9.pdf
+2025-08-24 00:27:06 - __main__ - INFO - Conversion completed successfully: D:\hoc\py\docxtopdf_thangvk\PDF_Output\muc8,9.pdf
+2025-08-24 00:27:08 - __main__ - INFO - Download successful: D:\hoc\py\docxtopdf_thangvk\Downloads\muc8,9.pdf
+2025-08-24 00:27:11 - __main__ - INFO - Application shutdown initiated
+2025-08-24 00:27:13 - __main__ - INFO - Application shutdown initiated
+2025-08-24 00:27:14 - __main__ - INFO - Application shutdown completed
+2025-08-24 00:27:14 - __main__ - INFO - Application shutdown initiated
