@@ -1,249 +1,96 @@
-# Ứng Dụng Chuyển Đổi Word sang PDF
 
-Ứng dụng desktop đơn giản và hiệu quả để chuyển đổi tài liệu Microsoft Word (.doc và .docx) sang định dạng PDF với giao diện đồ họa thân thiện.
+# Word to PDF & Excel to PDF Converter
 
-![Python](https://img.shields.io/badge/python-v3.8+-blue.svg)
-![Platform](https://img.shields.io/badge/platform-windows-lightgrey.svg)
-![License](https://img.shields.io/badge/license-MIT-green.svg)
+## Giới thiệu
 
-## 📋 Tính Năng
+Ứng dụng này cho phép người dùng chuyển đổi **file Word** (`.doc`, `.docx`) và **file Excel** (`.xls`, `.xlsx`) sang **định dạng PDF** dễ dàng. Dự án này sử dụng thư viện Python `docx2pdf` cho Word và `pywin32` cho Excel (nếu cần).
 
-- **Hỗ Trợ Nhiều Định Dạng**: Chuyển đổi cả file `.doc` và `.docx` sang PDF
-- **Engine Chuyển Đổi Thông Minh**: Tự động chọn phương pháp chuyển đổi tốt nhất
-  - File `.doc` → Sử dụng Microsoft Word (win32com) để tối ưu khả năng tương thích
-  - File `.docx` → Sử dụng docx2pdf để chuyển đổi nhanh hơn
-- **Giao Diện Thân Thiện**: Interface đơn giản với khả năng kéo thả được xây dựng bằng tkinter
-- **Xử Lý Hàng Loạt**: Chuyển đổi nhiều file một cách hiệu quả
-- **Ghi Log Chi Tiết**: Báo cáo lỗi toàn diện và logs chuyển đổi
-- **Quản Lý Output Tự Động**: Tổ chức PDF đầu ra với vị trí có thể tùy chỉnh
-- **Khôi Phục Lỗi**: Các phương pháp chuyển đổi dự phòng đảm bảo tỷ lệ thành công cao
+### Tính năng chính:
+- **Chuyển Word → PDF**: Sử dụng `docx2pdf` (Windows/macOS) hoặc `win32com` (Windows + Microsoft Word).
+- **Chuyển Excel → PDF**: Sử dụng `win32com` (Windows + Microsoft Excel).
+- **Giao diện người dùng Tkinter**: Giao diện đơn giản để chọn file và chuyển đổi sang PDF.
+- **Lưu tự động vào thư mục Downloads** sau khi chuyển đổi thành công.
 
-## 🚀 Bắt Đầu Nhanh
+## Cài đặt
 
-### Phương án 1: Chạy từ Source Code
+Để chạy ứng dụng, bạn cần cài đặt các thư viện cần thiết.
+
+### 1. Cài đặt yêu cầu
+
+Clone hoặc tải về dự án này về máy tính của bạn:
+
 ```bash
-# Clone hoặc tải project về
-cd docxtopdf_thangvk
+git clone https://github.com/khoaphan23/docxtopdf.git
+cd docxtopdf
+```
 
-# Cài đặt các thư viện cần thiết
+Sau đó, cài đặt các phụ thuộc:
+
+```bash
 pip install -r requirements.txt
-
-# Chạy ứng dụng
-python main.py
 ```
 
-### Phương án 2: Sử dụng File Thực Thi Đã Build
-1. Chạy build script: `python build.py`
-2. Tìm file `WordToPDF_Converter.exe` trong thư mục `dist`
-3. Double-click để chạy (không cần cài đặt Python)
+Các thư viện cần thiết:
+- `docx2pdf`: Chuyển đổi file Word sang PDF (Windows/macOS).
+- `pywin32`: Dùng để chuyển đổi Excel sang PDF trên Windows với Microsoft Excel.
 
-## 🛠️ Cài Đặt
+### 2. Yêu cầu hệ thống
 
-### Yêu Cầu Hệ Thống
-- **Python 3.8+** (để chạy từ source code)
-- **Microsoft Word** (khuyến khích cho việc chuyển đổi file .doc)
-- **Windows OS** (hỗ trợ chính)
+- **Windows/MacOS**: Đảm bảo đã cài đặt **Microsoft Word** (cho Word to PDF) và **Microsoft Excel** (cho Excel to PDF).
+- **Linux**: Hiện tại, không hỗ trợ Excel → PDF trên Linux do phụ thuộc vào `pywin32`.
 
-### Thư Viện Phụ Thuộc
+### 3. Cài đặt và chạy
+
+1. Để chạy ứng dụng Word → PDF:
 ```bash
-pip install pywin32 docx2pdf python-docx tkinter
+python main_word.py
 ```
 
-### Thiết Lập Phát Triển
+2. Để chạy ứng dụng Excel → PDF:
 ```bash
-# Clone repository
-git clone <repository-url>
-cd docxtopdf_thangvk
-
-# Cài đặt dependencies cho development
-pip install -r requirements.txt
-
-# Chạy ở chế độ phát triển
-python main.py
+python main_excel.py
 ```
 
-## 📁 Cấu Trúc Dự Án
+Sau khi chạy, giao diện sẽ hiện ra cho phép bạn chọn file và chuyển đổi sang PDF. Sau khi chuyển xong, file PDF sẽ được lưu trong thư mục **Downloads**.
+
+## Cấu trúc thư mục
 
 ```
-docxtopdf_thangvk/
-├── main.py                 # Điểm khởi đầu chính với khởi tạo GUI
-├── main_force.py           # Điểm khởi đầu thay thế với forced module reloading
-├── build.py               # Build script để tạo file thực thi
-├── requirements.txt       # Các thư viện Python cần thiết
-├── README.md             # Tài liệu dự án
-├── config.ini            # Cài đặt cấu hình
-├── src/                  # Thư mục source code chính
-│   ├── converters/       # Modules engine chuyển đổi
-│   │   └── doc_converter.py    # Converter chính với subprocess approach
-│   ├── interface/        # Components GUI
-│   │   └── gui.py           # Ứng dụng GUI chính
-│   ├── io/              # Utilities xử lý file
-│   │   └── file_handler.py    # Validation và quản lý file
-│   └── logging/         # Hệ thống logging
-│       └── logger_setup.py    # Cấu hình logging tập trung
-├── logs/                # Logs ứng dụng
-│   └── docxtopdf_*.log     # Files log hàng ngày
-├── PDF_Output/          # Thư mục output mặc định cho PDF đã chuyển đổi
-└── dist/               # File thực thi đã build (sau khi chạy build.py)
-    └── WordToPDF_Converter.exe
+docxtopdf/
+├─ .gitignore                # Các file và thư mục không được theo dõi bởi Git
+├─ README.md                 # File này
+├─ requirements.txt          # Liệt kê các phụ thuộc của dự án
+├─ main_word.py              # Main file cho Word → PDF Converter
+├─ main_excel.py             # Main file cho Excel → PDF Converter
+└─ src/
+   ├─ __init__.py            # Cấu hình chung của dự án
+   ├─ logging/logger_setup.py # Thiết lập logging
+   ├─ interface/tkinter_ui.py # Giao diện người dùng (UI)
+   ├─ io/file_handler.py      # Xử lý các thao tác file (chọn file, mở thư mục Downloads)
+   └─ converters/
+      ├─ word_to_pdf.py      # Chuyển đổi Word → PDF
+      └─ excel_to_pdf.py     # Chuyển đổi Excel → PDF
 ```
 
-## 🔧 Cách Sử Dụng
+## Cách sử dụng
 
-### Ứng Dụng GUI
-1. **Khởi động**: Chạy `python main.py` hoặc double-click file thực thi
-2. **Chọn File**: Click "Choose File" để duyệt và chọn tài liệu Word
-3. **Chuyển đổi**: Click "Convert to PDF" để bắt đầu quá trình chuyển đổi
-4. **Theo dõi**: Xem tiến trình và kiểm tra logs để có thông tin chi tiết
-5. **Truy cập Kết quả**: Tìm PDF đã chuyển đổi trong thư mục `PDF_Output`
+1. **Chạy ứng dụng**:
+   - Mở ứng dụng **Word → PDF** hoặc **Excel → PDF** bằng cách chạy `main_word.py` hoặc `main_excel.py`.
 
-### Sử Dụng Command Line
-```python
-from src.converters.doc_converter import DocumentConverter
+2. **Chọn file**:
+   - Bấm nút "Chọn file Word" hoặc "Chọn file Excel" để chọn file cần chuyển đổi.
 
-converter = DocumentConverter()
-result = converter.convert_to_pdf('input.docx', 'output.pdf')
-print(f"Đã chuyển đổi: {result}")
-```
+3. **Chuyển đổi**:
+   - Sau khi chọn file, bấm nút "Chuyển sang PDF" để bắt đầu quá trình chuyển đổi.
 
-## ⚙️ Cấu Hình
+4. **Mở thư mục Downloads**:
+   - Sau khi chuyển đổi thành công, bấm nút "Mở thư mục Downloads" để mở thư mục chứa file PDF đã chuyển đổi.
 
-### Phương Pháp Chuyển Đổi
-Ứng dụng tự động chọn phương pháp chuyển đổi tối ưu:
+## Ghi chú
 
-1. **Đối với file .doc**:
-   - Chính: Microsoft Word COM (win32com)
-   - Dự phòng: docx2pdf (khả năng tương thích hạn chế)
-
-2. **Đối với file .docx**:
-   - Chính: docx2pdf (nhanh hơn, không cần Word)
-   - Dự phòng: Microsoft Word COM (tương thích cao hơn)
-
-### Cấu Hình Logging
-- **Vị trí**: `logs/docxtopdf_YYYYMMDD.log`
-- **Cấp độ**: INFO (có thể cấu hình trong logger_setup.py)
-- **Tính năng**: Rotation, detailed error traces, conversion metrics
-
-### Cài Đặt Output
-- **Thư mục mặc định**: `PDF_Output/`
-- **Quy tắc đặt tên**: `{tên_file_gốc}.pdf`
-- **Xử lý đường dẫn**: Tự động tạo thư mục và resolve path
-
-## 🐛 Khắc Phục Sự Cố
-
-### Các Vấn Đề Thường Gặp
-
-#### Lỗi "All methods failed"
-- **Nguyên nhân**: Cả hai phương pháp chuyển đổi đều thất bại
-- **Giải pháp**: Kiểm tra logs chi tiết để xem thông báo lỗi cụ thể
-- **Yêu cầu**: Đảm bảo Microsoft Word đã được cài đặt cho file .doc
-
-#### Lỗi Import
-- **Nguyên nhân**: Thiếu Python dependencies
-- **Giải pháp**: Chạy `pip install -r requirements.txt`
-
-#### Lỗi Quyền Truy Cập
-- **Nguyên nhân**: File đang được sử dụng hoặc không đủ quyền
-- **Giải pháp**: Đóng tài liệu Word và chạy với quyền administrator nếu cần
-
-#### Vấn Đề Module Caching
-- **Nguyên nhân**: Xung đột Python module cache
-- **Giải pháp**: Sử dụng `main_force.py` thay vì `main.py`
-
-### Chế Độ Debug
-Để debug chi tiết, kiểm tra log files trong thư mục `logs/`:
-```bash
-tail -f logs/docxtopdf_*.log
-```
-
-## 🏗️ Build File Thực Thi
-
-Tạo file thực thi standalone không cần cài đặt Python:
-
-```bash
-# Chạy build script
-python build.py
-
-# Output sẽ có trong dist/WordToPDF_Converter.exe
-```
-
-### Tính Năng Build
-- **File thực thi đơn**: Tất cả được gom vào một file .exe
-- **Không có console window**: Trải nghiệm GUI sạch sẽ
-- **Bao gồm tất cả dependencies**: win32com, docx2pdf, tkinter
-- **Tự động tạo spec file**: Cấu hình PyInstaller được tối ưu
-
-## 🔍 Chi Tiết Kỹ Thuật
-
-### Kiến Trúc Chuyển Đổi
-- **Subprocess Isolation**: Mỗi chuyển đổi chạy trong process Python riêng biệt
-- **Threading Support**: GUI không blocking với background conversion
-- **Error Recovery**: Nhiều chiến lược fallback cho chuyển đổi mạnh mẽ
-- **Memory Management**: Xử lý hiệu quả tài liệu lớn
-
-### Tính Năng Bảo Mật
-- **Path Validation**: Input sanitization và path traversal protection
-- **File Type Verification**: Validation extension và content
-- **Process Isolation**: Subprocess execution ngăn xung đột hệ thống
-
-### Tối Ưu Hiệu Suất
-- **Smart Method Selection**: File-type aware conversion routing
-- **Parallel Processing**: Multi-threaded GUI và conversion engine
-- **Resource Management**: Automatic cleanup và memory optimization
-- **Caching Strategy**: Intelligent module loading và reloading
-
-## 🤝 Đóng Góp
-
-1. **Fork** repository
-2. **Tạo** feature branch (`git checkout -b feature/TinhNangTuyetVoi`)
-3. **Commit** thay đổi (`git commit -m 'Thêm tính năng tuyệt vời'`)
-4. **Push** lên branch (`git push origin feature/TinhNangTuyetVoi`)
-5. **Tạo** Pull Request
-
-### Hướng Dẫn Phát Triển
-- Tuân theo coding standards PEP 8
-- Thêm comprehensive logging cho tính năng mới
-- Bao gồm error handling cho tất cả external dependencies
-- Test với cả file .doc và .docx
-- Cập nhật documentation cho API changes
-
-## 📝 Giấy Phép
-
-Dự án này được cấp phép theo MIT License - xem file [LICENSE](LICENSE) để biết chi tiết.
-
-## 🙏 Lời Cảm Ơn
-
-- **Microsoft Word COM API** cho việc xử lý file .doc
-- **Thư viện docx2pdf** cho chuyển đổi .docx hiệu quả
-- **PyInstaller** cho packaging executable
-- **tkinter** cho GUI framework
-
-## 📞 Hỗ Trợ
-
-Nếu bạn gặp vấn đề hoặc có câu hỏi:
-
-1. **Kiểm tra Logs**: Xem `logs/docxtopdf_*.log` để có thông tin lỗi chi tiết
-2. **GitHub Issues**: Báo cáo bugs và yêu cầu tính năng
-3. **Documentation**: Tham khảo README này và inline code comments
-
-## 🔄 Lịch Sử Phiên Bản
-
-- **v1.0.0**: Release đầu tiên với chức năng chuyển đổi cơ bản
-- **v1.1.0**: Thêm smart method selection và cải thiện error handling
-- **v1.2.0**: Triển khai subprocess architecture để ổn định hơn
-- **v1.3.0**: Thêm comprehensive logging và cải thiện GUI
+- **Microsoft Word** và **Microsoft Excel** cần phải được cài đặt để chuyển đổi từ file Word hoặc Excel sang PDF.
+- Thư mục **Downloads** sẽ được sử dụng để lưu file PDF đã chuyển đổi.
 
 ---
 
-**Được tạo với ❤️ để chuyển đổi tài liệu hiệu quả**
-[Người dùng] 
-     ↓
-[interface.py] (Nhận yêu cầu → Gọi converter)
-     ↓
-[io_manager.py] (Đọc file đầu vào)
-     ↓
-[converter.py] (Xử lý chuyển đổi PNG → JPG)
-     ↓
-[io_manager.py] (Lưu file đầu ra)
-     ↓
-[logging_setup.py] (Ghi trạng thái: thành công/lỗi)
+**Chúc bạn sử dụng ứng dụng thành công!**
