@@ -1,6 +1,20 @@
 import os
 import configparser
 from pathlib import Path
+import logging
+import sys
+
+def setup_logger(name: str = "app", level: str = "INFO") -> logging.Logger:
+    logger = logging.getLogger(name)
+    if logger.handlers:
+        return logger
+    lvl = getattr(logging, level.upper(), logging.INFO)
+    logger.setLevel(lvl)
+    handler = logging.StreamHandler(stream=sys.stdout)
+    fmt = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    handler.setFormatter(fmt)
+    logger.addHandler(handler)
+    return logger
 
 
 # Tạo đối tượng configparser
@@ -69,6 +83,12 @@ CONVERSION_TIMEOUT = 60
 
 # Logging format constant added to fix missing attribute error
 LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+# App-wide constants (adjust as needed)
+APP_NAME = "Docx/Xlsx to PDF Converter"
+VERSION = "1.0.0"
+WINDOW_WIDTH = 680
+WINDOW_HEIGHT = 420
+
 
 
 # ===== Added by fix =====

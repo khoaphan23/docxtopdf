@@ -41,12 +41,10 @@ logs/
 *.env
 *.env.*
 !example.env
-# Nếu có file cấu hình local:
 config.ini
 !config.example.ini
 
 # --- App outputs / temp files
-# (Không commit PDF xuất ra hoặc file tạm)
 *.pdf
 *.tmp
 *.temp
