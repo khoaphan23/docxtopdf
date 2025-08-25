@@ -1,26 +1,69 @@
-# --- Runtime output ---
-Downloads/
-PDF_Output/
-logs/
-*.log
-*.pdf
-
-# --- Python cruft ---
+# --- Python bytecode & cache
 __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
-*.so
-dist/
-build/
-*.egg-info/
-pip-wheel-metadata/
 
-# --- Virtual env ---
+# --- Virtual environments
 .venv/
 venv/
 env/
+ENV/
 
-# --- IDE ---
+# --- Build / packaging / installer
+build/
+dist/
+*.egg-info/
+*.egg
+*.whl
+
+# --- Test / coverage (nếu có)
+.pytest_cache/
+.coverage
+htmlcov/
+
+# --- IDE / Editor
 .vscode/
 .idea/
+*.code-workspace
+
+# --- OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Logs & runtime
+*.log
+logs/
+*.pid
+
+# --- Local configs / secrets (giữ mẫu ví dụ nếu có)
+*.env
+*.env.*
+!example.env
+# Nếu có file cấu hình local:
+config.ini
+!config.example.ini
+
+# --- App outputs / temp files
+# (Không commit PDF xuất ra hoặc file tạm)
+*.pdf
+*.tmp
+*.temp
+
+# --- Office temp (Word, etc.)
+~$*.doc
+~$*.docx
+~$*.xlsx
+
+# --- Python tooling (optional)
+.mypy_cache/
+.pyre/
+.pytype/
+
+# --- OS-specific caches
+*.swp
+*.swo
+
+# --- Git merge artifacts
+*.orig
