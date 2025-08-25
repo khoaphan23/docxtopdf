@@ -1,0 +1,26 @@
+# --- Runtime output ---
+Downloads/
+PDF_Output/
+logs/
+*.log
+*.pdf
+
+# --- Python cruft ---
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+dist/
+build/
+*.egg-info/
+pip-wheel-metadata/
+
+# --- Virtual env ---
+.venv/
+venv/
+env/
+
+# --- IDE ---
+.vscode/
+.idea/
