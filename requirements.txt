@@ -5,3 +5,5 @@ Pillow>=10.0.0
 docx2pdf
 pywin32
 pandas fpdf
+pywin32 
+ttkbootstra
