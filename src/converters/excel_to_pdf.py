@@ -1,19 +1,29 @@
 # -*- coding: utf-8 -*-
 """
-Excel -> PDF (Windows + Excel), chống vỡ layout + tránh lỗi 'Document not saved' / WinError 32.
+Excel -> PDF (Windows + Excel), chống vỡ layout + tránh 'Document not saved' / WinError 32
++ sửa lỗi CẮT DẤU tiếng Việt bằng cách tăng chiều cao hàng có kiểm soát.
 
-- PrintArea = UsedRange
-- AutoFit hàng/cột
-- FitToPagesWide = 1, FitToPagesTall = False (co vừa 1 trang ngang)
-- Landscape mặc định (đổi sang Portrait nếu muốn)
-- Lề gọn, canh giữa ngang
-- Nếu file đích đang bị khóa: tự động lưu tên khác (thêm timestamp)
+- AutoFit cột/hàng, sau đó cộng thêm đệm:
+    * ROW_PADDING_PT: đệm cơ bản cho mọi hàng
+    * ROW_HEIGHT_SCALE: nhân thêm % chiều cao (để chắc chắn)
+    * EXTRA_WRAP_PADDING_PT: đệm cộng thêm nếu hàng có wrap/ xuống dòng
+    * TOP_ROWS_EXTRA_PAD_PT: đệm bổ sung cho vài hàng đầu (thường là tiêu đề)
+- VerticalAlignment = Center để hạn chế cắt trên/dưới
+- FitToPagesWide=1, FitToPagesTall=False; Landscape; lề gọn; canh giữa ngang
+- Xuất ra %TEMP% rồi move về đích; nếu file đích đang khóa, tự tạo tên mới (thêm timestamp)
 """
 
 import os
 import shutil
 import tempfile
 from datetime import datetime
+
+# === THAM SỐ ĐIỀU CHỈNH (tăng nếu còn cắt) ===
+ROW_PADDING_PT = 6.0            # đệm cơ bản (pt)
+ROW_HEIGHT_SCALE = 0.06          # cộng thêm 6% chiều cao sau AutoFit
+EXTRA_WRAP_PADDING_PT = 4.0      # đệm thêm nếu hàng có WrapText/ xuống dòng
+TOP_ROWS_TO_PAD = 3              # số hàng đầu coi như header
+TOP_ROWS_EXTRA_PAD_PT = 4.0      # đệm thêm cho các hàng đầu
 
 SUPPORTED_EXTS = {".xlsx", ".xls", ".xlsm", ".xlsb", ".xltx", ".xltm"}
 
@@ -40,7 +50,6 @@ def _unique_path_like(path: str) -> str:
 
 def _export_selected(excel, wb, out_path):
     """Export ActiveSheet(s) ra out_path. Nếu bị khoá -> đổi tên khác tự động."""
-    # Xuất ra TEMP trước rồi move về đích để tránh lỗi quyền/độ dài đường dẫn.
     tmp = os.path.join(tempfile.gettempdir(), os.path.basename(out_path))
     try:
         if os.path.exists(tmp):
@@ -58,26 +67,20 @@ def _export_selected(excel, wb, out_path):
             OpenAfterPublish=False
         )
 
-    # Export ra TEMP
     _do_export(tmp)
 
-    # Đảm bảo thư mục đích tồn tại
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
-
-    # Thử thay thế file đích (nếu tồn tại)
     try:
         if os.path.exists(out_path):
-            os.remove(out_path)  # nếu file đang mở sẽ ném WinError 32
+            os.remove(out_path)  # nếu đang mở sẽ ném WinError 32
         shutil.move(tmp, out_path)
         return out_path
     except Exception:
-        # File đích đang mở / khoá -> lưu với tên khác (thêm timestamp)
         alt = _unique_path_like(out_path)
         try:
             shutil.move(tmp, alt)
             return alt
         except Exception:
-            # Nếu vẫn lỗi, vứt vào thư mục người dùng (Downloads) cho chắc
             home = os.path.expanduser("~")
             fallback_dir = os.path.join(home, "Downloads")
             os.makedirs(fallback_dir, exist_ok=True)
@@ -86,14 +89,6 @@ def _export_selected(excel, wb, out_path):
             return alt2
 
 def excel_to_pdf(input_excel_path: str, output_pdf_path: str = None, sheet=None) -> str:
-    """
-    Convert Excel workbook/sheet to PDF (căn trang đẹp, an toàn khi file đích đang mở).
-
-    Args:
-        input_excel_path: đường dẫn file Excel.
-        output_pdf_path: đường dẫn PDF (nếu None, dùng cùng thư mục/tên với .pdf).
-        sheet: None (tất cả), int (1-based), hoặc str (tên sheet).
-    """
     _ensure_windows()
 
     if not is_excel_file(input_excel_path):
@@ -124,19 +119,65 @@ def excel_to_pdf(input_excel_path: str, output_pdf_path: str = None, sheet=None)
         excel.ScreenUpdating = False
         excel.EnableEvents = False
 
-        # Open ReadOnly để tránh đụng độ save
         wb = excel.Workbooks.Open(input_abs, UpdateLinks=0, ReadOnly=True)
 
         def setup_sheet(ws):
             try:
                 used = ws.UsedRange
-                # AutoFit giúp tránh chữ bị che
+
+                # (1) AutoFit để có chiều cao/ rộng chuẩn
                 try:
                     used.Columns.AutoFit()
                     used.Rows.AutoFit()
                 except Exception:
                     pass
 
+                # (2) Đệm chiều cao hàng:
+                try:
+                    first_row = used.Row
+                    last_row = first_row + used.Rows.Count - 1
+                    first_col = used.Column
+                    last_col = first_col + used.Columns.Count - 1
+
+                    for r in range(first_row, last_row + 1):
+                        row_obj = ws.Rows(r)
+                        # phát hiện hàng có wrap/ xuống dòng
+                        row_has_wrap = False
+                        try:
+                            rng_row = ws.Range(ws.Cells(r, first_col), ws.Cells(r, last_col))
+                            for cell in rng_row:
+                                try:
+                                    v = cell.Value
+                                    if bool(cell.WrapText) or (isinstance(v, str) and ("\n" in v or "\r" in v)):
+                                        row_has_wrap = True
+                                        break
+                                except Exception:
+                                    pass
+                        except Exception:
+                            pass
+
+                        try:
+                            h = float(row_obj.RowHeight)
+                            # nhân theo tỉ lệ rồi cộng đệm cơ bản
+                            new_h = max(h * (1.0 + ROW_HEIGHT_SCALE), h + ROW_PADDING_PT)
+                            # đệm thêm nếu có wrap hoặc nằm trong các hàng tiêu đề đầu
+                            if row_has_wrap:
+                                new_h += EXTRA_WRAP_PADDING_PT
+                            if (r - first_row) < TOP_ROWS_TO_PAD:
+                                new_h += TOP_ROWS_EXTRA_PAD_PT
+                            row_obj.RowHeight = new_h
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+
+                # (3) Căn giữa dọc để giảm rủi ro cắt trên/dưới
+                try:
+                    used.VerticalAlignment = constants.xlVAlignCenter
+                except Exception:
+                    pass
+
+                # (4) Thiết lập trang in
                 ps = ws.PageSetup
                 try: ps.Zoom = False
                 except Exception: pass
@@ -145,7 +186,7 @@ def excel_to_pdf(input_excel_path: str, output_pdf_path: str = None, sheet=None)
                     ps.FitToPagesTall = False
                 except Exception:
                     pass
-                try: ps.Orientation = constants.xlLandscape
+                try: ps.Orientation = constants.xlLandscape  # đổi sang xlPortrait nếu bạn muốn
                 except Exception: pass
                 try:
                     ps.LeftMargin   = _points(0.25)
@@ -172,7 +213,7 @@ def excel_to_pdf(input_excel_path: str, output_pdf_path: str = None, sheet=None)
             except Exception:
                 pass
 
-        # Thiết lập trang
+        # Thiết lập & export
         if sheet is not None:
             ws = wb.Sheets(sheet if isinstance(sheet, int) else str(sheet))
             setup_sheet(ws)
