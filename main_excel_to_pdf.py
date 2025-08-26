@@ -1,181 +1,126 @@
 # -*- coding: utf-8 -*-
 import os
-import threading
-import traceback
+import sys
 import tkinter as tk
 from tkinter import filedialog, messagebox
-
 try:
     import ttkbootstrap as tb
-    from ttkbootstrap.constants import *
-    THEME_OK = True
+    THEME = "sandstone"
 except Exception:
-    # Fallback nếu chưa cài ttkbootstrap -> dùng ttk chuẩn
-    import tkinter.ttk as tb
-    THEME_OK = False
-
+    tb = None
 from src.converters.excel_to_pdf import excel_to_pdf, is_excel_file
 
-def get_downloads_dir() -> str:
+def pick_excel():
+    return filedialog.askopenfilename(
+        title="Chọn file Excel",
+        filetypes=[("Excel files", "*.xlsx *.xls *.xlsm *.xlsb *.xltx *.xltm"), ("All files", "*.*")]
+    )
+
+def ensure_downloads():
     home = os.path.expanduser("~")
-    dl = os.path.join(home, "Downloads")
-    if not os.path.isdir(dl):
-        os.makedirs(dl, exist_ok=True)
-    return dl
+    for p in (os.path.join(home, "Downloads"), os.path.join(home, "Download"), home):
+        if os.path.isdir(p): return p
+    return home
 
 class App:
     def __init__(self, root):
         self.root = root
-        self.root.title("Excel to PDF Converter")
-        self.root.geometry("740x520")
+        self.root.title("Excel → PDF (3 bước)")
+        self.file_var = tk.StringVar()
+        self.save_dir = tk.StringVar(value=ensure_downloads())
+        self.out_var = tk.StringVar()
+        self.status = tk.StringVar(value="Chưa chọn file.")
+        self._build()
+
+    def _build(self):
+        frm = tk.Frame(self.root, padx=12, pady=12)
+        frm.pack(fill=tk.BOTH, expand=True)
+
+        # B1: chọn file
+        tk.Label(frm, text="BƯỚC 1: CHỌN FILE EXCEL", font=("Segoe UI", 10, "bold")).pack(anchor=tk.W)
+        r1 = tk.Frame(frm); r1.pack(fill=tk.X, pady=6)
+        tk.Entry(r1, textvariable=self.file_var).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0,8))
+        tk.Button(r1, text="Chọn…", command=self.on_pick).pack(side=tk.LEFT)
+
+        # B1.5: nơi lưu
+        tk.Label(frm, text="THƯ MỤC LƯU PDF", font=("Segoe UI", 9, "bold")).pack(anchor=tk.W, pady=(8,0))
+        r1b = tk.Frame(frm); r1b.pack(fill=tk.X, pady=6)
+        tk.Entry(r1b, textvariable=self.save_dir).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0,8))
+        tk.Button(r1b, text="Chọn nơi lưu…", command=self.on_pick_dir).pack(side=tk.LEFT)
+
+        # B2: chuyển đổi
+        tk.Label(frm, text="BƯỚC 2: CHUYỂN ĐỔI", font=("Segoe UI", 10, "bold")).pack(anchor=tk.W, pady=(10,0))
+        r2 = tk.Frame(frm); r2.pack(fill=tk.X, pady=6)
+        tk.Button(r2, text="Chuyển sang PDF", command=self.on_convert).pack(side=tk.LEFT)
+
+        # B3: mở thư mục
+        tk.Label(frm, text="BƯỚC 3: TẢI XUỐNG (mở thư mục chứa PDF)", font=("Segoe UI", 10, "bold")).pack(anchor=tk.W, pady=(10,0))
+        r3 = tk.Frame(frm); r3.pack(fill=tk.X, pady=6)
+        tk.Entry(r3, textvariable=self.out_var).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0,8))
+        tk.Button(r3, text="Mở thư mục", command=self.on_open_dir).pack(side=tk.LEFT)
+
+        tk.Label(frm, textvariable=self.status, fg="#006400").pack(anchor=tk.W, pady=(10,0))
+
+    def on_pick(self):
+        p = pick_excel()
+        if p:
+            self.file_var.set(p)
+            self.status.set("Đã chọn file. Nhấn 'Chuyển sang PDF'.")
+
+    def on_pick_dir(self):
+        d = filedialog.askdirectory(title="Chọn thư mục lưu PDF", initialdir=self.save_dir.get() or ensure_downloads())
+        if d:
+            self.save_dir.set(d)
+
+    def on_convert(self):
+        src = self.file_var.get().strip()
+        if not src:
+            messagebox.showwarning("Thiếu file", "Hãy chọn file Excel trước.")
+            return
+        if not is_excel_file(src):
+            messagebox.showerror("Sai định dạng", "File không phải Excel hợp lệ.")
+            return
         try:
-            self.root.iconbitmap(default='')
-        except Exception:
-            pass
+            out_dir = self.save_dir.get().strip() or ensure_downloads()
+            os.makedirs(out_dir, exist_ok=True)
+            out_path = os.path.join(out_dir, os.path.splitext(os.path.basename(src))[0] + ".pdf")
 
-        container = tb.Frame(self.root, padding=10)
-        container.pack(fill="both", expand=True)
+            self.status.set("Đang chuyển đổi…")
+            self.root.update()
+            pdf_path = excel_to_pdf(src, out_path)
 
-        title = tb.Label(container, text="📊 Excel to PDF Converter", font=("Segoe UI", 16, "bold"))
-        title.pack(anchor="w", pady=(0, 8))
+            self.out_var.set(pdf_path)
+            self.status.set("Xong! File PDF đã lưu.")
+            # Thông báo rõ nếu tên đã tự đổi do file bị khóa
+            if os.path.normpath(pdf_path) != os.path.normpath(out_path):
+                messagebox.showinfo("Đã lưu (đổi tên)",
+                    f"File đích đang bị mở/khóa nên đã lưu thành:\n{pdf_path}")
+            else:
+                messagebox.showinfo("Thành công", f"Đã lưu PDF:\n{pdf_path}")
+        except Exception as e:
+            messagebox.showerror("Lỗi chuyển đổi", str(e))
+            self.status.set("Có lỗi xảy ra.")
 
-        # ===== BƯỚC 1 =====
-        self.card1 = self._card(container)
-        self._card_header(self.card1, "📁 Bước 1: Chọn tệp")
-        self.lbl_support = tb.Label(self.card1, text="Hỗ trợ: .xls, .xlsx, .xlsm, .xlsb", foreground="#555")
-        self.lbl_support.pack(anchor="w", padx=10, pady=(0, 6))
-
-        self.path_var = tk.StringVar(value="Chưa chọn file...")
-        self.lbl_path = tb.Label(self.card1, textvariable=self.path_var, wraplength=650)
-        self.lbl_path.pack(anchor="w", padx=10, pady=(0, 8))
-
-        self.btn_choose = tb.Button(self.card1, text="Chọn file Excel", command=self.choose_file, width=22)
-        self.btn_choose.pack(anchor="w", padx=10, pady=(0, 10))
-
-        # ===== BƯỚC 2 =====
-        self.card2 = self._card(container)
-        self._card_header(self.card2, "⚙️ Bước 2: Chuyển đổi")
-
-        self.btn_convert = tb.Button(self.card2, text="Chuyển sang PDF", command=self.convert, width=22, state="disabled")
-        self.btn_convert.pack(anchor="w", padx=10, pady=(4, 6))
-
-        self.progress = tb.Progressbar(self.card2, mode="indeterminate")
-        self.progress.pack(fill="x", padx=10, pady=(0, 8))
-
-        self.status_var = tk.StringVar(value=" ")
-        self.lbl_status = tb.Label(self.card2, textvariable=self.status_var, foreground="#555", wraplength=650)
-        self.lbl_status.pack(anchor="w", padx=10, pady=(0, 6))
-
-        # ===== BƯỚC 3 =====
-        self.card3 = self._card(container)
-        self._card_header(self.card3, "⬇️ Bước 3: Tải xuống")
-
-        self.lbl_note = tb.Label(self.card3, text="File PDF sẽ được lưu vào thư mục Downloads", foreground="#555")
-        self.lbl_note.pack(anchor="w", padx=10, pady=(0, 8))
-
-        bwrap = tb.Frame(self.card3)
-        bwrap.pack(anchor="w", padx=10, pady=(0, 10))
-
-        self.btn_open_pdf = tb.Button(bwrap, text="Mở file PDF", command=self.open_pdf, width=20, state="disabled")
-        self.btn_open_pdf.grid(row=0, column=0, padx=(0, 10))
-
-        self.btn_open_downloads = tb.Button(bwrap, text="Mở thư mục Downloads", command=self.open_downloads, width=22)
-        self.btn_open_downloads.grid(row=0, column=1)
-
-        # internal state
-        self.last_output_path = None
-
-    # helpers
-    def _card(self, parent):
-        f = tb.Labelframe(parent)
-        f.pack(fill="x", expand=False, pady=6)
-        return f
-
-    def _card_header(self, frame, text):
-        lbl = tb.Label(frame, text=text, font=("Segoe UI", 11, "bold"))
-        lbl.pack(anchor="w", padx=10, pady=6)
-
-    # actions
-    def choose_file(self):
-        filetypes = [
-            ("Excel files", "*.xlsx *.xls *.xlsm *.xlsb *.xltx *.xltm"),
-            ("All files", "*.*"),
-        ]
-        path = filedialog.askopenfilename(title="Chọn file Excel", filetypes=filetypes)
-        if not path:
+    def on_open_dir(self):
+        p = self.out_var.get().strip()
+        if not p:
+            messagebox.showinfo("Chưa có file", "Bạn cần chuyển đổi trước.")
             return
-        if not is_excel_file(path):
-            messagebox.showerror("Lỗi", "Vui lòng chọn đúng file Excel (.xls/.xlsx/...)")
-            return
-
-        self.path_var.set(path)
-        self.status_var.set(" ")
-        self.btn_convert["state"] = "normal"
-        self.last_output_path = None
-        self.btn_open_pdf["state"] = "disabled"
-
-    def open_downloads(self):
-        os.startfile(get_downloads_dir())
-
-    def open_pdf(self):
-        if self.last_output_path and os.path.isfile(self.last_output_path):
-            os.startfile(self.last_output_path)
-        else:
-            messagebox.showwarning("Chưa có file", "Hãy chuyển đổi trước, rồi mới mở file PDF.")
-
-    def convert(self):
-        src = self.path_var.get()
-        if not os.path.isfile(src):
-            messagebox.showwarning("Chưa chọn file", "Vui lòng chọn file Excel trước.")
-            return
-
-        downloads = get_downloads_dir()
-        base = os.path.splitext(os.path.basename(src))[0] + ".pdf"
-        dst = os.path.join(downloads, base)
-
-        # chạy nền
-        self.btn_convert["state"] = "disabled"
-        self.progress.start(10)
-        self.status_var.set("Đang chuyển đổi...")
-        self.last_output_path = None
-        self.btn_open_pdf["state"] = "disabled"
-
-        def _work():
-            try:
-                out = excel_to_pdf(src, dst)
-                self.root.after(0, lambda: self.on_success(out))
-            except Exception as e:
-                tb = traceback.format_exc()
-                self.root.after(0, lambda: self.on_error(str(e), tb))
-            finally:
-                self.root.after(0, self._done)
-
-        threading.Thread(target=_work, daemon=True).start()
-
-    def _done(self):
-        self.progress.stop()
-        self.btn_convert["state"] = "normal"
-
-    def on_success(self, path):
-        self.status_var.set(f"✔ Hoàn thành: {path}")
-        self.last_output_path = path
-        self.btn_open_pdf["state"] = "normal"
+        folder = os.path.dirname(p) or os.getcwd()
         try:
-            self.root.bell()
+            if sys.platform.startswith("win"):
+                os.startfile(folder)
+            elif sys.platform == "darwin":
+                os.system(f'open "{folder}"')
+            else:
+                os.system(f'xdg-open "{folder}"')
         except Exception:
-            pass
-        messagebox.showinfo("Thành công", f"Đã xuất PDF:\n{path}\n\nBạn có thể bấm 'Mở file PDF' hoặc 'Mở thư mục Downloads'.")
-
-    def on_error(self, msg, detail=""):
-        self.status_var.set(f"✖ Lỗi: {msg}")
-        messagebox.showerror("Lỗi", f"{msg}\n\nChi tiết:\n{detail}")
+            messagebox.showwarning("Không mở được", folder)
 
 def main():
-    if THEME_OK:
-        root = tb.Window(themename="sandstone")
-    else:
-        root = tk.Tk()
+    root = tb.Window(themename="sandstone") if tb is not None else tk.Tk()
     App(root)
+    root.minsize(720, 320)
     root.mainloop()
 
 if __name__ == "__main__":
