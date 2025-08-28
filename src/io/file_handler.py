@@ -6,6 +6,7 @@ import subprocess
 from pathlib import Path
 from tkinter import filedialog, messagebox
 
+
 class FileHandler:
     def __init__(self, supported_extensions: tuple[str, ...] = ()) -> None:
         self.supported_extensions = tuple(supported_extensions) if supported_extensions else tuple()
@@ -24,6 +25,16 @@ class FileHandler:
             parent=parent,
         )
 
+    def select_image_file(self, parent=None) -> str | None:
+        return filedialog.askopenfilename(
+            title="Chọn tệp Ảnh",
+            filetypes=[
+                ("Image files", "*.png *.jpg *.jpeg *.bmp *.tif *.tiff *.webp"),
+                ("All files", "*.*"),
+            ],
+            parent=parent,
+        )
+
     def open_downloads_folder(self) -> None:
         downloads = Path.home() / "Downloads"
         downloads.mkdir(parents=True, exist_ok=True)
@@ -39,3 +50,5 @@ class FileHandler:
             messagebox.showinfo("Thành công", msg, parent=parent)
         else:
             messagebox.showerror("Lỗi", msg, parent=parent)
+    
+    
