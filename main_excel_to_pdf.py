@@ -1,9 +1,10 @@
-
+# main_excel_to_pdf.py
 from __future__ import annotations
 
 import os
 import shutil
 import tkinter as tk
+import sys, subprocess
 from tkinter import filedialog
 from pathlib import Path
 from typing import Optional, Tuple
@@ -40,6 +41,17 @@ class ExcelApp:
             self.logger.warning("Không thể tạo thư mục ./outputpdf, dùng thư mục tạm của hệ thống. Lý do: %s", e)
             self.temp_dir = Path(os.getenv("TEMP", Path.home())) / "outputpdf_tmp"
             self.temp_dir.mkdir(parents=True, exist_ok=True)
+
+    # ----------------------- Back button -----------------------
+    def _on_back(self) -> None:
+        """Đóng trang hiện tại và mở lại launcher (nếu có)."""
+        try:
+            main_path = Path(__file__).resolve().parent / "main.py"
+            if main_path.exists():
+                subprocess.Popen([sys.executable, str(main_path)], cwd=str(main_path.parent))
+        finally:
+            if self.root:
+                self.root.destroy()
 
     # ----------------------- UI Callbacks -----------------------
     def _on_select(self) -> None:
@@ -116,9 +128,8 @@ class ExcelApp:
                     "Bây giờ nhấn 'Tải về…' để chọn nơi lưu bản chính.",
                     100
                 )
+                # đổi nhãn nút bước 3 nếu UI hỗ trợ
                 try:
-                    # Nếu ConverterUI có API đổi nhãn nút thứ 3, ta đổi thành 'Tải về…'
-                    # Không lỗi nếu không hỗ trợ.
                     self.ui.set_open_downloads_text("Tải về…")
                 except Exception:
                     pass
@@ -177,6 +188,11 @@ class ExcelApp:
     def run(self) -> None:
         self.root = tk.Tk()
 
+        # Top bar + nút quay lại
+        topbar = tk.Frame(self.root)
+        topbar.pack(fill="x", padx=10, pady=(8, 0))
+        tk.Button(topbar, text="← Quay lại", command=self._on_back).pack(side="left")
+
         # Khởi tạo UI chung để đồng bộ giao diện với Word
         self.ui = ConverterUI(
             root=self.root,
@@ -190,7 +206,7 @@ class ExcelApp:
             downloads_hint_text="📥 Bước 3: Nhấn 'Tải về…'",
             supported_extensions=SUPPORTED_EXTENSIONS_EXCEL,
             window_title="Excel → PDF",
-            window_size="700x440",
+            window_size="1000x580",
         )
 
         # Sau khi tạo UI, cố gắng đổi nhãn nút thứ 3 → 'Tải về…' (nếu UI hỗ trợ)

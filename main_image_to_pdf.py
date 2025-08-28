@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import shutil
 import tkinter as tk
+import sys, subprocess
 from tkinter import filedialog
 from pathlib import Path
 from typing import Optional, Tuple
@@ -165,6 +166,9 @@ class ImageToPDFApp:
 
     def run(self) -> None:
         self.root = tk.Tk()
+        topbar = tk.Frame(self.root)
+        topbar.pack(fill="x", padx=10, pady=(8, 0))
+        tk.Button(topbar, text="← Quay lại", command=self._on_back).pack(side="left")
         self.ui = ConverterUI(
             self.root,
             on_select=self._on_select,
@@ -173,17 +177,32 @@ class ImageToPDFApp:
             title_text="🖼️ Image → PDF",
             select_button_text="Chọn ảnh",
             convert_button_text="Chuyển sang PDF",
-            downloads_hint_text="📥 Bước 3: Tải về – chọn nơi lưu cuối",
+            downloads_hint_text="📥 Bước 3: Tải về ... ",
             supported_extensions=SUPPORTED_PATTERNS,
             window_title="Image to PDF Converter",
-            window_size="680x420",
+            window_size="1000x580",
         )
+       
 
         if self.ui:
             self.ui.update_status("✅ Sẵn sàng - Chọn tệp Ảnh để bắt đầu", 0)
             self.ui.set_buttons_enabled(select=True, convert=False, open_downloads=True, quit_btn=True)
 
         self.root.mainloop()
+    def _on_back(self) -> None:
+        """Đóng trang hiện tại và mở lại launcher (nếu có)."""
+        try:
+            main_path = Path(__file__).resolve().parent / "main.py"
+            if main_path.exists():
+                subprocess.Popen([sys.executable, str(main_path)], cwd=str(main_path.parent))
+        except Exception as e:
+            # nếu không mở được launcher, vẫn cứ đóng trang hiện tại
+            try:
+                self.logger.warning("Không mở được launcher: %s", e)
+            except Exception:
+                pass
+        if self.root:
+            self.root.destroy()
 
 
 if __name__ == "__main__":

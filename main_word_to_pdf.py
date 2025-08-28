@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import shutil
 import tkinter as tk
+import sys, subprocess
 from tkinter import filedialog
 from pathlib import Path
 from typing import Optional, Tuple
@@ -144,7 +145,6 @@ class WordApp:
                 self.ui.alert_error("Lỗi", f"Không thể chuyển đổi: {e}")
                 self.ui.update_status("❌ Lỗi khi chuyển đổi. Hãy thử lại hoặc kiểm tra file Word.", 0)
                 self.ui.set_buttons_enabled(select=True, convert=True, open_downloads=True, quit_btn=True)
-
     def _on_save_as(self) -> None:
         """Bước 3: Chọn nơi 'Tải về…' (Save As) từ bản PDF tạm."""
         if not self.temp_pdf_path or not self.temp_pdf_path.exists():
@@ -190,7 +190,15 @@ class WordApp:
     def run(self) -> None:
         self.root = tk.Tk()
 
-        # Khởi tạo UI chung để đồng bộ giao diện
+        topbar = tk.Frame(self.root)
+        topbar.pack(fill="x", padx=10, pady=(8, 0))
+        tk.Button(topbar, text="← Quay lại", command=self._on_back).pack(side="left")
+            # Tăng kích thước & cho resize
+        self.root.geometry("1200x780")   # rộng x cao
+        self.root.minsize(1100, 720)     # không cho thu nhỏ quá
+        self.root.resizable(True, True)
+
+        # (tùy chọn) phóng to khi mở và tăng scale cho màn DPI cao
         self.ui = ConverterUI(
             root=self.root,
             on_select=self._on_select,
@@ -203,22 +211,30 @@ class WordApp:
             downloads_hint_text="📥 Bước 3: Nhấn 'Tải về…'",
             supported_extensions=SUPPORTED_EXTENSIONS_WORD,
             window_title="Word → PDF",
-            window_size="700x440",
+            window_size="1000x580",
         )
-
-        # cố gắng đổi nhãn nút thứ 3 → 'Tải về…' (nếu UI hỗ trợ)
-        try:
-            self.ui.set_open_downloads_text("Tải về…")
-        except Exception:
-            pass
-
+        def _on_back(self) -> None:
+            try:
+                self.ui.set_open_downloads_text("Tải về…")
+            except Exception:
+                pass
+        
         # Trạng thái ban đầu
         if self.ui:
             self.ui.update_status("✅ Sẵn sàng - Chọn tệp Word để bắt đầu", 0)
             self.ui.set_buttons_enabled(select=True, convert=False, open_downloads=True, quit_btn=True)
 
         self.root.mainloop()
-
+            
+    def _on_back(self):
+            try:
+                main_path = Path(__file__).resolve().parent / "main.py"
+                if main_path.exists():
+                    subprocess.Popen([sys.executable, str(main_path)], cwd=str(main_path.parent))
+            except Exception:
+                pass
+            if self.root:
+                self.root.destroy()
 
 def main() -> None:
     WordApp().run()
