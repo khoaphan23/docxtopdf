@@ -65,3 +65,4 @@ config.ini
 
 # --- Git merge artifacts
 *.orig
+*.outputpdf/

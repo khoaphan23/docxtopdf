@@ -7,23 +7,37 @@ import tkinter as tk
 from tkinter import filedialog
 from pathlib import Path
 from typing import Optional, Tuple
+from src.converters.word_to_pdf import word_to_pdf, is_word_file
+
 
 # Core modules
 from src.logging.logger_setup import setup_logger
 from src.interface.tkinter_ui import ConverterUI
 from src.io.file_handler import FileHandler
-from src.converters.excel_to_pdf import excel_to_pdf, is_excel_file
 
-SUPPORTED_EXTENSIONS_EXCEL: Tuple[str, ...] = (".xls", ".xlsx", ".xlsm", ".xlsb", ".xltx", ".xltm")
+# Converters — adjust imports to your actual module names if different
+try:
+    from src.converters.word_to_pdf import word_to_pdf, is_word_file  # preferred if exists
+except Exception:
+    # Fallback to docx_to_pdf naming if your project uses that
+    from src.converters.docx_to_pdf import docx_to_pdf as word_to_pdf  # type: ignore
+    try:
+        from src.converters.docx_to_pdf import is_docx_file as is_word_file  # type: ignore
+    except Exception:
+        # last resort — simple extension check
+        def is_word_file(p: str) -> bool:
+            return str(p).lower().endswith((".doc", ".docx"))
+
+SUPPORTED_EXTENSIONS_WORD: Tuple[str, ...] = (".doc", ".docx")
 
 
-class ExcelApp:
+class WordApp:
     def __init__(self) -> None:
         # Logger
-        self.logger = setup_logger("ExcelApp", level="INFO")
+        self.logger = setup_logger("WordApp", level="INFO")
 
         # Core helpers
-        self.fh = FileHandler(supported_extensions=SUPPORTED_EXTENSIONS_EXCEL)
+        self.fh = FileHandler(supported_extensions=SUPPORTED_EXTENSIONS_WORD)
 
         # State
         self.root: Optional[tk.Tk] = None
@@ -43,31 +57,31 @@ class ExcelApp:
 
     # ----------------------- UI Callbacks -----------------------
     def _on_select(self) -> None:
-        """Chọn file Excel (ưu tiên dùng FileHandler)."""
         try:
-            path_str = self.fh.select_excel_file(parent=self.root)
+            path_str = self.fh.select_file(parent=self.root, title="Chọn tệp Word…")
         except Exception as e:
-            self.logger.exception("Lỗi khi mở hộp thoại chọn file: %s", e)
-            if self.ui:
-                self.ui.alert_error("Lỗi", "Không mở được hộp thoại chọn file.")
-            return
-
-        if not path_str:
-            if self.ui:
-                self.ui.update_status("ℹ️ Bạn chưa chọn tệp nào.", 0)
-            return
+            self.logger.warning("Select via FileHandler lỗi: %s -> dùng fallback tk filedialog", e)
+            from tkinter import filedialog as fd
+            import os
+            patterns = ("*.docx", "*.doc")
+            path_str = fd.askopenfilename(
+                parent=self.root,
+                title="Chọn tệp Word…",
+                filetypes=[("Word documents", patterns), ("All files", "*.*")],
+                initialdir=os.path.expanduser("~"),
+            )
 
         path = Path(path_str)
-        if not is_excel_file(str(path)):
+        if not is_word_file(str(path)):
             if self.ui:
-                self.ui.alert_warning("Sai định dạng", "Hãy chọn tệp Excel hợp lệ (xls, xlsx, xlsm, xlsb, xltx, xltm).")
+                self.ui.alert_warning("Sai định dạng", "Hãy chọn tệp Word hợp lệ (doc, docx).")
                 self.ui.update_status("⚠️ Tệp không hợp lệ. Hãy chọn lại.", 0)
             return
 
         self.selected_file = path
         self.temp_pdf_path = None  # reset temp if reselect
         if self.ui:
-            self.ui.update_status(f"✅ Đã chọn: {path.name}. Nhấn 'Chuyển sang PDF'.", 10)
+            self.ui.update_status(f"✅ Đã chọn: {path.name}. Nhấn 'Chuyển sang PDF' để tạo bản tạm.", 10)
             self.ui.set_buttons_enabled(convert=True)
 
     def _make_unique(self, dest: Path) -> Path:
@@ -83,17 +97,17 @@ class ExcelApp:
             i += 1
 
     def _on_convert(self) -> None:
-        """Thực hiện chuyển đổi Excel → PDF, lưu TẠM vào ./outputpdf/."""
+        """Thực hiện chuyển đổi Word → PDF, lưu TẠM vào ./outputpdf/."""
         if not self.selected_file:
             if self.ui:
-                self.ui.alert_warning("Thiếu tệp", "Hãy chọn tệp Excel trước khi chuyển đổi.")
-                self.ui.update_status("⚠️ Chưa có tệp. Vui lòng chọn tệp Excel.", 0)
+                self.ui.alert_warning("Thiếu tệp", "Hãy chọn tệp Word trước khi chuyển đổi.")
+                self.ui.update_status("⚠️ Chưa có tệp. Vui lòng chọn tệp Word.", 0)
             return
 
         src = self.selected_file
-        if not is_excel_file(str(src)):
+        if not is_word_file(str(src)):
             if self.ui:
-                self.ui.alert_warning("Sai định dạng", "Tệp đã chọn không phải Excel hợp lệ.")
+                self.ui.alert_warning("Sai định dạng", "Tệp đã chọn không phải Word hợp lệ.")
                 self.ui.update_status("⚠️ Tệp không hợp lệ. Hãy chọn lại.", 0)
             return
 
@@ -106,7 +120,7 @@ class ExcelApp:
             tmp_out = self._make_unique(self.temp_dir / (src.stem + ".pdf"))
 
             # Thực thi converter → xuất TẠM
-            pdf_path_str = excel_to_pdf(str(src), str(tmp_out))
+            pdf_path_str = word_to_pdf(str(src), str(tmp_out))
             pdf_path = Path(pdf_path_str) if pdf_path_str else tmp_out
             self.temp_pdf_path = pdf_path
 
@@ -118,7 +132,6 @@ class ExcelApp:
                 )
                 try:
                     # Nếu ConverterUI có API đổi nhãn nút thứ 3, ta đổi thành 'Tải về…'
-                    # Không lỗi nếu không hỗ trợ.
                     self.ui.set_open_downloads_text("Tải về…")
                 except Exception:
                     pass
@@ -126,10 +139,10 @@ class ExcelApp:
                 # mở lại các nút + bật nút 'Tải về…'
                 self.ui.set_buttons_enabled(select=True, convert=True, open_downloads=True, quit_btn=True)
         except Exception as e:
-            self.logger.exception("Lỗi khi chuyển đổi Excel → PDF: %s", e)
+            self.logger.exception("Lỗi khi chuyển đổi Word → PDF: %s", e)
             if self.ui:
                 self.ui.alert_error("Lỗi", f"Không thể chuyển đổi: {e}")
-                self.ui.update_status("❌ Lỗi khi chuyển đổi. Hãy thử lại hoặc kiểm tra file Excel.", 0)
+                self.ui.update_status("❌ Lỗi khi chuyển đổi. Hãy thử lại hoặc kiểm tra file Word.", 0)
                 self.ui.set_buttons_enabled(select=True, convert=True, open_downloads=True, quit_btn=True)
 
     def _on_save_as(self) -> None:
@@ -177,23 +190,23 @@ class ExcelApp:
     def run(self) -> None:
         self.root = tk.Tk()
 
-        # Khởi tạo UI chung để đồng bộ giao diện với Word
+        # Khởi tạo UI chung để đồng bộ giao diện
         self.ui = ConverterUI(
             root=self.root,
             on_select=self._on_select,
             on_convert=self._on_convert,
-            # DÙNG callback nút thứ 3 để 'Tải về…' (Save As) thay vì 'Mở Downloads'
+            # DÙNG callback nút thứ 3 để 'Tải về…' (Save As)
             on_open_downloads=self._on_save_as,
-            title_text="🔄 Excel → PDF",
-            select_button_text="Chọn tệp Excel…",
+            title_text="🔄 Word → PDF",
+            select_button_text="Chọn tệp Word…",
             convert_button_text="Chuyển sang PDF",
             downloads_hint_text="📥 Bước 3: Nhấn 'Tải về…'",
-            supported_extensions=SUPPORTED_EXTENSIONS_EXCEL,
-            window_title="Excel → PDF",
+            supported_extensions=SUPPORTED_EXTENSIONS_WORD,
+            window_title="Word → PDF",
             window_size="700x440",
         )
 
-        # Sau khi tạo UI, cố gắng đổi nhãn nút thứ 3 → 'Tải về…' (nếu UI hỗ trợ)
+        # cố gắng đổi nhãn nút thứ 3 → 'Tải về…' (nếu UI hỗ trợ)
         try:
             self.ui.set_open_downloads_text("Tải về…")
         except Exception:
@@ -201,15 +214,14 @@ class ExcelApp:
 
         # Trạng thái ban đầu
         if self.ui:
-            self.ui.update_status("✅ Sẵn sàng - Chọn tệp Excel để bắt đầu", 0)
-            # chỉ bật nút Convert sau khi có file, nút 'Tải về…' cho phép bấm nhưng sẽ báo nếu chưa có bản tạm
+            self.ui.update_status("✅ Sẵn sàng - Chọn tệp Word để bắt đầu", 0)
             self.ui.set_buttons_enabled(select=True, convert=False, open_downloads=True, quit_btn=True)
 
         self.root.mainloop()
 
 
 def main() -> None:
-    ExcelApp().run()
+    WordApp().run()
 
 
 if __name__ == "__main__":

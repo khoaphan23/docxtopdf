@@ -1,109 +1,183 @@
+# src/converters/word_to_pdf.py
 from __future__ import annotations
 
-import logging
+import os
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Iterable, Optional, Tuple
 
-logger = logging.getLogger(__name__)
+# Hỗ trợ đuôi Word
+WORD_EXTS = {".docx", ".doc"}
 
-class DocumentConverter:
-    """Word (doc/docx) → PDF.
-    1) docx2pdf (Windows/macOS)
-    2) win32com (Windows + Word)
+def is_word_file(path: str | os.PathLike) -> bool:
+    return Path(path).suffix.lower() in WORD_EXTS
+
+# -------------------- tiện ích --------------------
+def mm_to_pt(mm: float) -> float:
+    # 1 inch = 25.4 mm, 1 pt = 1/72 inch
+    return mm * 72.0 / 25.4
+
+def _ensure_parent_dir(p: Path) -> None:
+    p.parent.mkdir(parents=True, exist_ok=True)
+
+# -------------------- Engine: docx2pdf --------------------
+def _word_to_pdf_docx2pdf(src: str, dst: str) -> None:
     """
+    Dùng thư viện docx2pdf (trên Windows dùng Word ngầm).
+    pip install docx2pdf
+    """
+    from docx2pdf import convert  # ModuleNotFoundError nếu chưa cài
+    convert(src, dst)
 
-    SUPPORTED_EXTS = (".doc", ".docx")
+# -------------------- Engine: COM (Word) --------------------
+def _word_to_pdf_com(
+    src: str,
+    dst: str,
+    page_size: Optional[str] = None,           # "A4" | "Letter" | None
+    orientation: Optional[str] = None,         # "Portrait" | "Landscape" | None
+    margins_mm: Optional[Tuple[float, float, float, float]] = None,  # (left, right, top, bottom)
+    page_range: Optional[Tuple[int, int]] = None,   # (from_page, to_page), 1-based inclusive
+    optimize_for: str = "Print",               # "Print" | "Screen"
+    open_after_export: bool = False,
+    pdf_a: bool = False                        # ISO19005-1 (PDF/A)
+) -> None:
+    """
+    Dùng Microsoft Word qua COM (pywin32). Cần Windows + MS Word + pip install pywin32
+    """
+    import win32com.client as win32  # ModuleNotFoundError nếu chưa cài
 
-    def __init__(self) -> None:
-        self.method = None
-        self.available = False
-        self._detect()
+    # Constants Word
+    wdExportFormatPDF = 17
+    wdExportOptimizeForPrint = 0
+    wdExportOptimizeForOnScreen = 1
+    wdExportAllDocument = 0
+    wdExportFromTo = 3
 
-    def _detect(self) -> None:
+    wdOrientPortrait = 0
+    wdOrientLandscape = 1
+    wdPaperA4 = 7
+    wdPaperLetter = 2
+
+    word = win32.DispatchEx("Word.Application")
+    word.Visible = False
+    doc = None
+    try:
+        doc = word.Documents.Open(os.path.abspath(src))
+
+        # Page setup (tuỳ chọn)
+        if page_size or orientation or margins_mm:
+            ps = doc.PageSetup
+            if page_size:
+                page_size_u = page_size.strip().lower()
+                if page_size_u == "a4":
+                    ps.PaperSize = wdPaperA4
+                elif page_size_u == "letter":
+                    ps.PaperSize = wdPaperLetter
+            if orientation:
+                ori_u = orientation.strip().lower()
+                ps.Orientation = wdOrientLandscape if ori_u == "landscape" else wdOrientPortrait
+            if margins_mm:
+                left, right, top, bottom = margins_mm
+                ps.LeftMargin = mm_to_pt(left)
+                ps.RightMargin = mm_to_pt(right)
+                ps.TopMargin = mm_to_pt(top)
+                ps.BottomMargin = mm_to_pt(bottom)
+
+        # Export options
+        if page_range and page_range[0] >= 1 and page_range[1] >= page_range[0]:
+            export_range = wdExportFromTo
+            from_p, to_p = int(page_range[0]), int(page_range[1])
+        else:
+            export_range = wdExportAllDocument
+            from_p, to_p = 1, 1  # ignored
+
+        optimize = wdExportOptimizeForOnScreen if optimize_for.lower() == "screen" else wdExportOptimizeForPrint
+
+        doc.ExportAsFixedFormat(
+            OutputFileName=os.path.abspath(dst),
+            ExportFormat=wdExportFormatPDF,
+            OpenAfterExport=open_after_export,
+            OptimizeFor=optimize,
+            Range=export_range,
+            From=from_p,
+            To=to_p,
+            Item=0,  # wdExportDocumentContent
+            IncludeDocProps=True,
+            KeepIRM=True,
+            CreateBookmarks=1,
+            DocStructureTags=True,
+            BitmapMissingFonts=True,
+            UseISO19005_1=bool(pdf_a),
+        )
+    finally:
+        if doc is not None:
+            doc.Close(False)
+        word.Quit()
+
+# -------------------- API chính: word_to_pdf --------------------
+def word_to_pdf(
+    src_path: str,
+    dst_path: Optional[str] = None,
+    engine: str = "auto",                       # "auto" | "docx2pdf" | "com"
+    *,
+    page_size: Optional[str] = None,            # áp dụng cho COM
+    orientation: Optional[str] = None,          # áp dụng cho COM
+    margins_mm: Optional[Tuple[float, float, float, float]] = None,  # áp dụng cho COM
+    page_range: Optional[Tuple[int, int]] = None,                    # áp dụng cho COM
+    optimize_for: str = "Print",                # COM: "Print" | "Screen"
+    open_after_export: bool = False,            # COM
+    pdf_a: bool = False                         # COM
+) -> str:
+    """
+    Chuyển 1 file Word (.doc/.docx) -> PDF. Trả về đường dẫn PDF.
+
+    - Giữ tương thích: có thể truyền dst_path như tham số thứ 2 (positional), hoặc keyword.
+    - engine="auto": thử docx2pdf trước, nếu thiếu thì dùng COM.
+    - Khi cần khống chế layout in ấn (A4, lề, xoay ngang…), dùng engine="com" kèm các tuỳ chọn.
+    """
+    if not is_word_file(src_path):
+        raise ValueError(f"Không phải file Word hợp lệ: {src_path}")
+
+    src = Path(src_path).resolve()
+    if dst_path is None:
+        dst = src.with_suffix(".pdf")
+    else:
+        dst = Path(dst_path).resolve()
+
+    _ensure_parent_dir(dst)
+
+    def try_docx2pdf() -> bool:
         try:
-            import docx2pdf  # noqa: F401
-            self.method = "docx2pdf"
-            self.available = True
-            return
-        except Exception:
-            pass
-        try:
-            import win32com.client  # noqa: F401
-            import pythoncom  # noqa: F401
-            self.method = "win32com"
-            self.available = True
-            return
-        except Exception as e:
-            logger.warning(f"Word converter: no method available: {e}")
-            self.method = None
-            self.available = False
+            _word_to_pdf_docx2pdf(str(src), str(dst))
+            return True
+        except ModuleNotFoundError:
+            return False
 
-    def is_available(self) -> tuple[bool, str]:
-        if self.available and self.method:
-            return True, f"Sẵn sàng ({self.method})"
-        return False, "Chưa có phương thức chuyển Word phù hợp (cần docx2pdf hoặc Word+pywin32)."
+    if engine == "docx2pdf":
+        if not try_docx2pdf():
+            raise ModuleNotFoundError("Chưa cài docx2pdf (pip install docx2pdf)")
+    elif engine == "com":
+        _word_to_pdf_com(
+            str(src), str(dst),
+            page_size=page_size,
+            orientation=orientation,
+            margins_mm=margins_mm,
+            page_range=page_range,
+            optimize_for=optimize_for,
+            open_after_export=open_after_export,
+            pdf_a=pdf_a,
+        )
+    else:
+        # auto
+        if not try_docx2pdf():
+            _word_to_pdf_com(
+                str(src), str(dst),
+                page_size=page_size,
+                orientation=orientation,
+                margins_mm=margins_mm,
+                page_range=page_range,
+                optimize_for=optimize_for,
+                open_after_export=open_after_export,
+                pdf_a=pdf_a,
+            )
 
-    def convert_word_to_pdf(self, input_path: Path, output_path: Path) -> tuple[bool, str]:
-        try:
-            input_path = Path(input_path)
-            output_path = Path(output_path)
-            if input_path.suffix.lower() not in self.SUPPORTED_EXTS:
-                return False, "File không phải Word (.doc/.docx)."
-
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-
-            if self.method == "docx2pdf":
-                from docx2pdf import convert
-                convert(str(input_path), str(output_path))
-                return True, f"Đã xuất PDF: {output_path.name}"
-
-            if self.method == "win32com":
-                import pythoncom
-                import win32com.client
-                pythoncom.CoInitialize()
-                word = None
-                doc = None
-                try:
-                    word = win32com.client.DispatchEx("Word.Application")
-                    word.Visible = False
-                    doc = word.Documents.Open(str(input_path))
-                    # 17 = wdFormatPDF
-                    doc.SaveAs(str(output_path), FileFormat=17)
-                finally:
-                    try:
-                        if doc is not None:
-                            doc.Close(False)
-                    except Exception:
-                        pass
-                    try:
-                        if word is not None:
-                            word.Quit()
-                    except Exception:
-                        pass
-                    pythoncom.CoUninitialize()
-                return True, f"Đã xuất PDF: {output_path.name}"
-
-            return False, "Không có phương thức chuyển đổi khả dụng."
-        except Exception as e:
-            err = f"Lỗi Word → PDF: {e}"
-            logger.exception(err)
-            return False, err
-
-    def convert_and_save_to_downloads(self, input_path: Path) -> tuple[bool, str, Optional[Path]]:
-        try:
-            downloads = Path.home() / "Downloads"
-            downloads.mkdir(parents=True, exist_ok=True)
-            name_part = Path(input_path).stem
-            out = downloads / f"{name_part}.pdf"
-            i = 1
-            while out.exists():
-                out = downloads / f"{name_part}_{i}.pdf"
-                i += 1
-            ok, msg = self.convert_word_to_pdf(Path(input_path), out)
-            if ok:
-                return True, f"Đã lưu PDF vào Downloads: {out.name}", out
-            return False, msg, None
-        except Exception as e:
-            err = f"Lỗi lưu Word → PDF: {e}"
-            logger.exception(err)
-            return False, err, None
+    return str(dst)
